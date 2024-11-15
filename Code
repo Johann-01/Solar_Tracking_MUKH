@@ -1,0 +1,118 @@
+#include <Servo.h>
+
+// Pinbelegung für LDRs, Servos und Solarzelle
+const int horizontalServoPin = 5;  // Pin für den horizontalen Servo
+const int verticalServoPin = 6;    // Pin für den vertikalen Servo
+const int ldrPin1 = A0;            // Lichtsensor 1 (links - horizontal)
+const int ldrPin2 = A1;            // Lichtsensor 2 (rechts - horizontal)
+const int ldrPin3 = A2;            // Lichtsensor 3 (oben - vertikal)
+const int ldrPin4 = A3;            // Lichtsensor 4 (unten - vertikal)
+const int solarCellPin = A4;       // Pin für die Solarzelle (Spannungssensor)
+const int redPin = 3;              // Roter Pin der RGB-LED
+const int greenPin = 4;            // Grüner Pin der RGB-LED
+const int bluePin = 2;             // Blauer Pin der RGB-LED
+
+Servo horizontalServo;
+Servo verticalServo;
+
+int horizontalPosition = 90;       // Startposition des horizontalen Servos
+int verticalPosition = 90;         // Startposition des vertikalen Servos
+
+void setup() {
+  Serial.begin(9600);
+  
+  horizontalServo.attach(horizontalServoPin);
+  verticalServo.attach(verticalServoPin);
+  
+  pinMode(ldrPin1, INPUT);  // Lichtsensoren einlesen
+  pinMode(ldrPin2, INPUT);
+  pinMode(ldrPin3, INPUT);
+  pinMode(ldrPin4, INPUT);
+  pinMode(solarCellPin, INPUT);  // Solarzellen-Eingang
+  pinMode(redPin, OUTPUT);  // RGB-LED
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+  
+  // Initialisiere die Servos auf die Startpositionen
+  horizontalServo.write(horizontalPosition);  // Startposition der Servos
+  verticalServo.write(verticalPosition);
+  
+  delay(1000);  // Warte 1 Sekunde, um sicherzustellen, dass die Servos in Position sind
+}
+
+void loop() {
+  // Lese Werte von den Lichtsensoren
+  int light1 = analogRead(ldrPin1); // Wert von LDR1 (links)
+  int light2 = analogRead(ldrPin2); // Wert von LDR2 (rechts)
+  int light3 = analogRead(ldrPin3); // Wert von LDR3 (oben)
+  int light4 = analogRead(ldrPin4); // Wert von LDR4 (unten)
+  
+  // Lese den Wert der Solarzelle (Spannungssensor)
+  int solarValue = analogRead(solarCellPin); // Solarzellenwert (analog)
+  
+  // Berechne die Effizienz anhand der Lichtsensorwerte
+  int totalLight = light1 + light2 + light3 + light4;
+  int maxLight = 1023 * 4;  // Maximum möglicher Wert von vier Lichtsensoren
+  int efficiency = map(totalLight, 0, maxLight, 0, 255);
+  
+  // Berechne den Solarwert (Solarzellenwert 0-1023) und mappe ihn auf 0-255
+  float voltage = (solarValue / 1023.0) * 5.0;  // Umrechnung des ADC-Werts in Spannung (Volt)
+  
+  // Optional: Berechnung der Leistung in Watt (mit Stromsensor, falls verfügbar)
+  // float current = getCurrent(); // Stromwert in Ampere (von einem Stromsensor)
+  // float power = voltage * current; // Berechnung der Leistung in Watt
+  
+  // **RGB-LED Steuerung basierend auf Solarzellenwert**
+  if (voltage > 3.5) {
+    setRGBColor(0, 255, 0);  // Grün für hohe Solarintensität
+  } else if (voltage > 2.5) {
+    setRGBColor(255, 255, 0);  // Gelb für mittlere Solarintensität
+  } else {
+    setRGBColor(255, 0, 0);  // Rot für niedrige Solarintensität
+  }
+
+  // Berechne die Differenz der Lichtsensorwerte für horizontale und vertikale Ausrichtung
+  int horizontalDiff = light2 - light1;  // Unterschied zwischen links und rechts
+  int verticalDiff = light3 - light4;    // Unterschied zwischen oben und unten
+
+  // **Größere Servo-Bewegungsänderungen für sichtbare Bewegung**
+  horizontalPosition += map(horizontalDiff, -1023, 1023, -10, 10);  // Größere Bewegungen
+  verticalPosition += map(verticalDiff, -1023, 1023, -10, 10);      // Größere Bewegungen
+
+  // Begrenzung der Servo-Bewegung auf einen gültigen Bereich (0-180 Grad)
+  horizontalPosition = constrain(horizontalPosition, 0, 180);
+  verticalPosition = constrain(verticalPosition, 0, 180);
+
+  // Setze die Servo-Positionen
+  horizontalServo.write(horizontalPosition);
+  verticalServo.write(verticalPosition);
+
+  // Serielle Ausgabe der Lichtsensorwerte zur Diagnose
+  Serial.print("LDR1: ");
+  Serial.print(light1);
+  Serial.print(" LDR2: ");
+  Serial.print(light2);
+  Serial.print(" LDR3: ");
+  Serial.print(light3);
+  Serial.print(" LDR4: ");
+  Serial.println(light4);
+
+  // Ausgabe des Solarzellenwerts in Volt
+  Serial.print("Solarzellen-Spannung: ");
+  Serial.print(voltage, 2);  // Ausgabe der Spannung mit 2 Dezimalstellen
+  Serial.println(" V");
+
+  // Optional: Ausgabe der Leistung in Watt, wenn ein Stromsensor verwendet wird
+  // Serial.print("Leistung: ");
+  // Serial.print(power, 2);  // Ausgabe der Leistung in Watt mit 2 Dezimalstellen
+  // Serial.println(" W");
+
+  delay(100);  // 100ms Pause für Stabilität
+}
+
+// Funktion zum Setzen der RGB-LED
+void setRGBColor(int red, int green, int blue) {
+  analogWrite(redPin, red);
+  analogWrite(greenPin, green);
+  analogWrite(bluePin, blue);
+}
